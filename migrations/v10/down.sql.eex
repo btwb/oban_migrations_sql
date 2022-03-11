@@ -1,0 +1,10 @@
+ALTER TABLE <%= @prefix %>.oban_jobs
+    ALTER COLUMN args SET DEFAULT NULL,
+    ALTER COLUMN priority DROP NOT NULL,
+
+    DROP CONSTRAINT attempt_range,
+    DROP CONSTRAINT positive_max_attempts,
+    DROP CONSTRAINT priority_range;
+
+DROP INDEX IF EXISTS <%= @prefix %>.oban_jobs_args_index;
+DROP INDEX IF EXISTS <%= @prefix %>.oban_jobs_meta_index;

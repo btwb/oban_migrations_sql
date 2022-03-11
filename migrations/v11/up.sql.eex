@@ -1,0 +1,7 @@
+CREATE UNLOGGED TABLE IF NOT EXISTS <%= @prefix %>.oban_peers
+(
+    name       text                        NOT NULL PRIMARY KEY,
+    node       text                        NOT NULL,
+    started_at timestamp WITHOUT TIME ZONE NOT NULL,
+    expires_at timestamp WITHOUT TIME ZONE NOT NULL
+);

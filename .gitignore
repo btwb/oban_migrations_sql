@@ -1,0 +1,2 @@
+# Prevent users commiting default outputs from testing.
+/out

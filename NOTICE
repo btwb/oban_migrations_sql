@@ -1,0 +1,22 @@
+Oban Migrations as SQL
+
+Portions of Oban Migrations as SQL’s code are Copyright 2019 Parker Selbert.
+
+Portions of Oban Migrations as SQL’s code are Copyright 2022 BTWB, LLC, a California limited
+liability company.
+
+All rights reserved. Each owner of material licensed as part of Oban Migrations as SQL reserves all
+rights not expressly granted to licensees or to any other person or organization pursuant to
+the applicable license.
+
+Oban Migrations as SQL includes contributions from the following:
+
+BTWB, LLC, a California limited liability company:
+* Benjamin Yu <ben@btwb.com>
+
+Software Mansion Spółka z ograniczoną odpowiedzialnością Spółka Komandytowa (Kraków, Poland):
+* Marek Kaput <marek.kaput@swmansion.com>
+
+Migration templates are manually translated from original Oban Ecto migrations:
+
+Oban is Copyright 2019 Parker Selbert.

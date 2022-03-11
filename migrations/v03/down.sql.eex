@@ -1,0 +1,2 @@
+ALTER TABLE <%= @prefix %>.oban_jobs
+    DROP COLUMN IF EXISTS attempted_by;

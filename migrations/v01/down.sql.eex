@@ -1,0 +1,8 @@
+DROP TRIGGER IF EXISTS oban_notify ON <%= @prefix %>.oban_jobs;
+DROP FUNCTION IF EXISTS <%= @prefix %>.oban_jobs_notify();
+DROP TABLE IF EXISTS <%= @prefix %>.oban_jobs CASCADE;
+DROP TYPE IF EXISTS <%= @prefix %>.oban_job_state;
+
+<%= if @create_schema do %>
+DROP SCHEMA IF EXISTS <%= @prefix %> CASCADE;
+<% end %>

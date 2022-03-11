@@ -1,0 +1,39 @@
+DROP INDEX IF EXISTS <%= @prefix %>.oban_jobs_state_queue_priority_scheduled_at_id_index;
+
+CREATE INDEX IF NOT EXISTS oban_jobs_queue_state_scheduled_at_id_index
+    ON <%= @prefix %>.oban_jobs (queue, state, scheduled_at, id);
+
+ALTER TABLE <%= @prefix %>.oban_jobs
+    DROP COLUMN IF EXISTS discarded_at,
+    DROP COLUMN IF EXISTS priority,
+    DROP COLUMN IF EXISTS tags;
+CREATE OR REPLACE FUNCTION <%= @prefix %>.oban_jobs_notify() RETURNS trigger AS
+$$
+DECLARE
+    channel text;
+    notice  json;
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        channel = '<%= @prefix %>.oban_insert';
+        notice = JSON_BUILD_OBJECT('queue', NEW.queue, 'state', NEW.state);
+        -- No point triggering for a job that isn't scheduled to run now
+        IF NEW.scheduled_at IS NOT NULL AND NEW.scheduled_at > NOW() AT TIME ZONE 'utc' THEN
+            RETURN NULL;
+        END IF;
+    ELSE
+        channel = '<%= @prefix %>.oban_update';
+        notice = JSON_BUILD_OBJECT('queue', NEW.queue, 'new_state', NEW.state, 'old_state',
+                                   OLD.state);
+    END IF;
+    PERFORM pg_notify(channel, notice::text);
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS oban_notify ON <%= @prefix %>.oban_jobs;
+
+CREATE TRIGGER oban_notify
+    AFTER INSERT OR UPDATE OF state
+    ON <%= @prefix %>.oban_jobs
+    FOR EACH ROW
+EXECUTE PROCEDURE <%= @prefix %>.oban_jobs_notify();

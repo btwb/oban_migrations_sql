@@ -1,0 +1,73 @@
+<%= if @create_schema do %>
+CREATE SCHEMA IF NOT EXISTS <%= @prefix %>;
+<% end %>
+
+DO
+$$
+    BEGIN
+        IF NOT EXISTS(SELECT 1
+                      FROM pg_type
+                      WHERE typname = 'oban_job_state'
+                        AND typnamespace = '<%= @prefix %>'::regnamespace::oid) THEN
+            CREATE TYPE <%= @prefix %>.oban_job_state AS ENUM (
+                'available',
+                'scheduled',
+                'executing',
+                'retryable',
+                'completed',
+                'discarded'
+                );
+        END IF;
+    END
+$$;
+
+CREATE TABLE IF NOT EXISTS <%= @prefix %>.oban_jobs
+(
+    id           BIGSERIAL PRIMARY KEY,
+    state        <%= @prefix %>.oban_job_state     NOT NULL DEFAULT 'available',
+    queue        TEXT                        NOT NULL DEFAULT 'default',
+    worker       TEXT                        NOT NULL,
+    args         JSONB                       NOT NULL,
+    errors       JSONB[]                     NOT NULL DEFAULT ARRAY []::JSONB[],
+    attempt      INTEGER                     NOT NULL DEFAULT 0,
+    max_attempts INTEGER                     NOT NULL DEFAULT 20,
+    inserted_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT timezone('UTC', NOW()),
+    scheduled_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT timezone('UTC', NOW()),
+    attempted_at TIMESTAMP WITHOUT TIME ZONE,
+    completed_at TIMESTAMP WITHOUT TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS oban_jobs_queue_index ON <%= @prefix %>.oban_jobs (queue);
+CREATE INDEX IF NOT EXISTS oban_jobs_state_index ON <%= @prefix %>.oban_jobs (state);
+CREATE INDEX IF NOT EXISTS oban_jobs_scheduled_at_index ON <%= @prefix %>.oban_jobs (scheduled_at);
+
+CREATE OR REPLACE FUNCTION <%= @prefix %>.oban_jobs_notify() RETURNS trigger AS
+$$
+DECLARE
+    channel text;
+    notice  json;
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        channel = '<%= @prefix %>.oban_insert';
+        notice = JSON_BUILD_OBJECT('queue', NEW.queue, 'state', NEW.state);
+        -- No point triggering for a job that isn't scheduled to run now
+        IF NEW.scheduled_at IS NOT NULL AND NEW.scheduled_at > NOW() AT TIME ZONE 'utc' THEN
+            RETURN NULL;
+        END IF;
+    ELSE
+        channel = '<%= @prefix %>.oban_update';
+        notice = JSON_BUILD_OBJECT('queue', NEW.queue, 'new_state', NEW.state, 'old_state',
+                                   OLD.state);
+    END IF;
+    PERFORM pg_notify(channel, notice::text);
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS oban_notify ON <%= @prefix %>.oban_jobs;
+
+CREATE TRIGGER oban_notify
+    AFTER INSERT OR UPDATE OF state
+    ON <%= @prefix %>.oban_jobs
+    FOR EACH ROW
+EXECUTE PROCEDURE <%= @prefix %>.oban_jobs_notify();

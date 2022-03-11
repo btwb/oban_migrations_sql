@@ -1,0 +1,27 @@
+ALTER TABLE <%= @prefix %>.oban_jobs
+    DROP COLUMN IF EXISTS meta,
+    DROP COLUMN IF EXISTS cancelled_at;
+
+DO
+$$
+    BEGIN
+        UPDATE <%= @prefix %>.oban_jobs SET state = 'discarded' WHERE state = 'cancelled';
+        ALTER TYPE <%= @prefix %>.oban_job_state RENAME TO old_oban_job_state;
+        CREATE TYPE <%= @prefix %>.oban_job_state AS ENUM (
+            'available',
+            'scheduled',
+            'executing',
+            'retryable',
+            'completed',
+            'discarded'
+            );
+        ALTER TABLE <%= @prefix %>.oban_jobs
+            RENAME COLUMN state TO _state;
+        ALTER TABLE <%= @prefix %>.oban_jobs
+            ADD state <%= @prefix %>.oban_job_state NOT NULL DEFAULT 'available';
+        UPDATE <%= @prefix %>.oban_jobs SET state = _state::text::<%= @prefix %>.oban_job_state;
+        ALTER TABLE <%= @prefix %>.oban_jobs
+            DROP COLUMN _state;
+        DROP TYPE <%= @prefix %>.old_oban_job_state;
+    END
+$$;

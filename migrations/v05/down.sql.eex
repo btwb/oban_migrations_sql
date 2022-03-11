@@ -1,0 +1,7 @@
+DROP INDEX IF EXISTS <%= @prefix %>.oban_jobs_queue_state_scheduled_at_id_index;
+
+CREATE INDEX IF NOT EXISTS oban_jobs_queue_index ON <%= @prefix %>.oban_jobs (queue);
+CREATE INDEX IF NOT EXISTS oban_jobs_state_index ON <%= @prefix %>.oban_jobs (state);
+
+CREATE INDEX IF NOT EXISTS oban_jobs_scheduled_at_index ON <%= @prefix %>.oban_jobs (scheduled_at)
+    WHERE state IN ('available'::<%= @prefix %>.oban_job_state, 'scheduled'::<%= @prefix %>.oban_job_state);

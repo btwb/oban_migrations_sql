@@ -1,0 +1,6 @@
+CREATE OR REPLACE FUNCTION <%= @prefix %>.oban_wrap_id(value bigint) RETURNS int AS
+$$
+BEGIN
+    RETURN (CASE WHEN value > 2147483647 THEN MOD(value, 2147483647) ELSE value END)::int;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;

@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS <%= @prefix %>.oban_jobs_attempted_at_id_index;

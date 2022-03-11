@@ -1,0 +1,32 @@
+ALTER TABLE <%= @prefix %>.oban_jobs
+    ADD COLUMN IF NOT EXISTS discarded_at timestamp WITHOUT TIME ZONE,
+    ADD COLUMN IF NOT EXISTS priority     integer DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS tags         character varying(255)[] DEFAULT ARRAY[]::character varying[];
+
+DROP INDEX IF EXISTS <%= @prefix %>.oban_jobs_queue_state_scheduled_at_id_index;
+
+CREATE INDEX IF NOT EXISTS oban_jobs_state_queue_priority_scheduled_at_id_index
+    ON <%= @prefix %>.oban_jobs (state, queue, priority, scheduled_at, id);
+
+CREATE OR REPLACE FUNCTION <%= @prefix %>.oban_jobs_notify() RETURNS trigger AS
+$$
+DECLARE
+    channel text;
+    notice  json;
+BEGIN
+    IF NEW.state = 'available' THEN
+        channel = '<%= @prefix %>.oban_insert';
+        notice = JSON_BUILD_OBJECT('queue', NEW.queue);
+        PERFORM pg_notify(channel, notice::text);
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS oban_notify ON <%= @prefix %>.oban_jobs;
+
+CREATE TRIGGER oban_notify
+    AFTER INSERT
+    ON <%= @prefix %>.oban_jobs
+    FOR EACH ROW
+EXECUTE PROCEDURE <%= @prefix %>.oban_jobs_notify();

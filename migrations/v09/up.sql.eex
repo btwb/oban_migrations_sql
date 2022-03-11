@@ -1,0 +1,41 @@
+ALTER TABLE <%= @prefix %>.oban_jobs
+    ADD COLUMN IF NOT EXISTS meta         jsonb DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS cancelled_at timestamp WITHOUT TIME ZONE;
+
+DO
+$$
+    DECLARE
+        version int;
+        already bool;
+    BEGIN
+        SELECT CURRENT_SETTING('server_version_num')::int INTO version;
+        SELECT '{cancelled}' <@ ENUM_RANGE(NULL::<%= @prefix %>.oban_job_state)::text[] INTO already;
+        IF already THEN
+            RETURN;
+        ELSIF version >= 120000 THEN
+            ALTER TYPE <%= @prefix %>.oban_job_state ADD VALUE IF NOT EXISTS 'cancelled';
+        ELSE
+            ALTER TYPE <%= @prefix %>.oban_job_state RENAME TO old_oban_job_state;
+            CREATE TYPE <%= @prefix %>.oban_job_state AS ENUM (
+                'available',
+                'scheduled',
+                'executing',
+                'retryable',
+                'completed',
+                'discarded',
+                'cancelled'
+                );
+            ALTER TABLE <%= @prefix %>.oban_jobs
+                RENAME COLUMN state TO _state;
+            ALTER TABLE <%= @prefix %>.oban_jobs
+                ADD state <%= @prefix %>.oban_job_state NOT NULL DEFAULT 'available';
+            UPDATE <%= @prefix %>.oban_jobs SET state = _state::text::<%= @prefix %>.oban_job_state;
+            ALTER TABLE <%= @prefix %>.oban_jobs
+                DROP COLUMN _state;
+            DROP TYPE <%= @prefix %>.old_oban_job_state;
+        END IF;
+    END
+$$;
+
+CREATE INDEX IF NOT EXISTS oban_jobs_state_queue_priority_scheduled_at_id_index
+    ON <%= @prefix %>.oban_jobs (state, queue, priority, scheduled_at, id);
